@@ -71,6 +71,12 @@ defimpl ExAdmin.Render, for: List do
   end
 end
 
+defimpl ExAdmin.Render, for: Geo.Point do
+  def to_string(point) do
+    Geo.WKT.encode(point)
+  end
+end
+
 # defimpl ExAdmin.Render, for: Any do
 #   def to_string(data), do: "#{inspect data}"
 # end
