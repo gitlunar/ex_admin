@@ -9,6 +9,9 @@ defmodule ExAdmin.Repo do
 
   def repo, do: Application.get_env(:ex_admin, :repo)
 
+  defp stringify_key(key) when is_atom(key), do: Atom.to_string(key)
+  defp stringify_key(key) when is_binary(key), do: key
+
   def changeset(fun, resource, nil), do: changeset(fun, resource, %{})
   def changeset(fun, resource, params) do
     %ExAdmin.Changeset{}
@@ -20,7 +23,7 @@ defmodule ExAdmin.Repo do
   def changeset(%Changeset{} = changeset, fun, resource, nil),
     do: changeset(changeset, fun, resource, %{})
   def changeset(%Changeset{} = changeset, fun, resource, params) do
-    cs = fun.(resource, params)
+    cs = fun.(resource, param_stringify_keys(params))
     Changeset.update(changeset, valid?: cs.valid?, changeset: cs, errors: cs.errors)
   end
 
@@ -323,6 +326,8 @@ res
   def get_assoc_join_model(resource, field) do
     res_model = resource.__struct__
     case res_model.__schema__(:association, field) do
+      %Ecto.Association.Has{queryable: queryable} ->
+        {:ok, queryable}
       %{through: [first, second]} ->
         {:ok, {res_model.__schema__(:association, first).related, second}}
       _ ->
@@ -337,6 +342,8 @@ res
     case get_assoc_join_model(resource, field) do
       {:ok, {assoc, second}} ->
         {assoc.__schema__(:association, second).related, assoc}
+      {:ok, assoc_model} ->
+        {assoc_model, field}
       error ->
         error
     end
@@ -351,5 +358,13 @@ res
     |> Enum.sort(&(elem(&1, 0) < elem(&2, 0)))
     res
   end
+
+  def param_stringify_keys(%{__struct__: _}=params), do: params
+  def param_stringify_keys(params) when is_map(params) do
+    Map.to_list(params)
+    |> Enum.map(fn {key, value} -> {stringify_key(key), param_stringify_keys(value)} end)
+    |> Enum.into(%{})
+  end
+  def param_stringify_keys(params), do: params
 
 end
